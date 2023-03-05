@@ -18,12 +18,17 @@ func main() {
 			continue
 		}
 
+		if msg == "\n" {
+			continue
+		}
+
 		reply, err := cli.Say("user", msg)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
-		fmt.Printf("%+v\n", reply)
+		fmt.Printf("From %s\n%+s\n", reply.Role, reply.Message)
+		fmt.Printf("\n\n")
 	}
 }

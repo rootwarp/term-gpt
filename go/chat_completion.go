@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 )
@@ -52,17 +51,16 @@ type CompletionClient interface {
 }
 
 type openAICompletionClient struct {
-	apiKey string
+	apiKey         string
+	messageHistory []chatMessage
 }
 
 func (c *openAICompletionClient) Say(role, message string) (*Reply, error) {
-	url := "https://api.openai.com/v1/chat/completions"
+	newMsg := chatMessage{Role: role, Content: message}
 
 	msg := completionRequest{
-		Model: ModelTypeGPT3_5TURBO,
-		Messages: []chatMessage{
-			{Role: role, Content: message},
-		},
+		Model:    ModelTypeGPT3_5TURBO,
+		Messages: append(c.messageHistory, newMsg),
 	}
 
 	rawMsg, err := json.Marshal(msg)
@@ -70,6 +68,7 @@ func (c *openAICompletionClient) Say(role, message string) (*Reply, error) {
 		return nil, err
 	}
 
+	url := "https://api.openai.com/v1/chat/completions"
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(rawMsg))
 	req.Header.Add("Authorization", "Bearer "+c.apiKey)
 	req.Header.Add("Content-Type", "application/json; charset=utf-8")
@@ -91,8 +90,10 @@ func (c *openAICompletionClient) Say(role, message string) (*Reply, error) {
 		return nil, err
 	}
 
-	// TODO
-	fmt.Println(string(body))
+	c.messageHistory = append(c.messageHistory, newMsg)
+	for _, choice := range compResp.Choices {
+		c.messageHistory = append(c.messageHistory, choice.Message)
+	}
 
 	return &Reply{
 		Message: compResp.Choices[0].Message.Content,
@@ -101,5 +102,8 @@ func (c *openAICompletionClient) Say(role, message string) (*Reply, error) {
 }
 
 func NewClient(apiKey string) CompletionClient {
-	return &openAICompletionClient{apiKey: apiKey}
+	return &openAICompletionClient{
+		apiKey:         apiKey,
+		messageHistory: make([]chatMessage, 0),
+	}
 }
